@@ -8,9 +8,7 @@ import os
 from heapq import heappush, heappop
 from collections import defaultdict
 
-# --- Setup and Utility ---
 
-# Set Seeds for Reproducibility
 SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
@@ -19,9 +17,7 @@ FIGURES_DIR = "figs"
 if not os.path.exists(FIGURES_DIR):
     os.makedirs(FIGURES_DIR)
 
-# Function to handle NumPy serialization for JSON (Prevents TypeErrors)
 def convert_to_serializable(obj):
-    """Recursively converts NumPy types to standard Python types for JSON serialization."""
     if isinstance(obj, np.integer):
         return int(obj)
     elif isinstance(obj, np.floating):
@@ -36,11 +32,7 @@ def convert_to_serializable(obj):
         return tuple(convert_to_serializable(i) for i in obj)
     return obj
 
-# --- EXECUTION SETUP: USE A SOLVABLE PLACEHOLDER MAZE ---
-
-# Placeholder maze generation function (adapted from your original code)
 def generate_solvable_maze(rows, cols):
-    """Generates a randomized, guaranteed solvable maze."""
     grid = np.ones((rows, cols), dtype=int)
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
     stack = [(1, 1)] 
@@ -64,12 +56,11 @@ def generate_solvable_maze(rows, cols):
     final_maze = np.copy(grid)
     start_pos = (1, 1)
     goal_pos = (rows - 2, cols - 2)
-    final_maze[start_pos] = 0 # Path (Agent starts here)
-    final_maze[goal_pos] = 2 # Goal marker
+    final_maze[start_pos] = 0 
+    final_maze[goal_pos] = 2 
 
     return final_maze, start_pos, goal_pos
 
-# Generate a 25x25 maze for a successful run
 MAZE_ROWS, MAZE_COLS = 25, 25
 maze, start_pos, goal_pos = generate_solvable_maze(MAZE_ROWS, MAZE_COLS)
 MAZE_FILE_NAME = "Generated Maze (25x25)" 
@@ -77,9 +68,7 @@ MAZE_FILE_NAME = "Generated Maze (25x25)"
 print(f"Maze loaded successfully: {MAZE_FILE_NAME} (Start: {start_pos}, Goal: {goal_pos})")
 print("Maze shape:", maze.shape)
 
-# --- Q-LEARNING ENVIRONMENT ---
 class MazeEnv:
-    """Environment for the maze problem."""
     def __init__(self, maze, start, goal):
         self.maze = maze
         self.start = start
@@ -89,19 +78,16 @@ class MazeEnv:
         self.n_rows, self.n_cols = maze.shape
 
     def reset(self):
-        """Resets the environment to the starting state."""
         self.state = self.start
         return self.state
 
     def step(self, action):
-        """Performs a step in the environment based on the given action."""
         r, c = self.state
         if action == 'up': r -= 1
         elif action == 'down': r += 1
         elif action == 'left': c -= 1
         elif action == 'right': c += 1
 
-        # Check for invalid moves (Out of bounds or wall)
         if r < 0 or c < 0 or r >= self.n_rows or c >= self.n_cols or self.maze[r, c] == 1:
             return self.state, -5, False 
 
@@ -111,9 +97,7 @@ class MazeEnv:
         
         return self.state, -1, False
 
-# --- Q-LEARNING ALGORITHM (Unchanged) ---
 def q_learning(env, episodes=500, alpha=0.9, gamma=0.99, epsilon_start=1.0, epsilon_end=0.01, decay_rate=0.005, max_steps=1000):
-    """Performs Q-Learning training with Epsilon-Decay."""
     Q = defaultdict(float) 
     steps_per_episode = []
     cumulative_rewards = []
@@ -151,11 +135,9 @@ def q_learning(env, episodes=500, alpha=0.9, gamma=0.99, epsilon_start=1.0, epsi
 
     return Q, steps_per_episode, cumulative_rewards
 
-# --- A* ALGORITHM (Unchanged) ---
 def a_star(maze, start, goal):
-    """Finds the shortest path in the maze using the A* algorithm."""
     rows, cols = maze.shape
-    h = lambda pos: abs(goal[0]-pos[0]) + abs(goal[1]-pos[1]) # Manhattan heuristic
+    h = lambda pos: abs(goal[0]-pos[0]) + abs(goal[1]-pos[1]) 
     
     open_list = []
     heappush(open_list, (h(start), start)) 
@@ -189,28 +171,23 @@ def a_star(maze, start, goal):
                     heappush(open_list, (f_score, neighbor))
     return None
 
-# --- MAIN EXECUTION AND ANALYSIS ---
 
 env = MazeEnv(maze, start=start_pos, goal=goal_pos)
 start, goal = env.start, env.goal
 EPISODES = 500
 
-# 1. Run A* (for optimal benchmark)
 start_time_a = time.time() 
 a_star_path = a_star(maze, start, goal)
 a_star_runtime = time.time() - start_time_a
 a_star_steps = len(a_star_path) - 1 if a_star_path else np.inf 
 
-# 2. Train Q-learning
 start_time_q = time.time() 
 Q, q_steps, q_rewards = q_learning(env, episodes=EPISODES)
 q_runtime = time.time() - start_time_q
 
-# Get the average steps for the *last 10%* of episodes
 LAST_N = max(1, len(q_steps) // 10)
 q_learned_steps = np.mean(q_steps[-LAST_N:])
 
-# --- Comparison Metrics and Analysis ---
 if a_star_steps == np.inf:
     optimal_path_pct = 0
     analysis_text = "A* could not find a path. Q-Learning optimality cannot be calculated."
@@ -230,7 +207,6 @@ else:
 
 print("\n" + analysis_text)
 
-# --- LOGGING ---
 
 log_data = pd.DataFrame({
     'Episode': range(EPISODES),
@@ -258,9 +234,6 @@ with open("summary.json", 'w') as f:
     json.dump(summary_data, f, indent=4)
 print("Saved summary data to summary.json")
 
-# --- PLOTS (Visualization functions remain the same) ---
-
-# Function to extract learned path from Q-table
 def get_q_path(env, Q, max_steps):
     state = env.start
     path = [state]
@@ -283,7 +256,6 @@ def get_q_path(env, Q, max_steps):
 
 q_path = get_q_path(env, Q, max_steps=maze.size * 2)
 
-# 1. Steps Taken Plot (with Moving Average)
 plt.figure(figsize=(10, 6))
 plt.plot(log_data['Steps_Taken'], alpha=0.3, label="Steps per Episode")
 plt.plot(log_data['Steps_MA_50'], color='blue', label="Steps 50-Episode MA") 
@@ -296,18 +268,17 @@ plt.grid(True, linestyle=':', alpha=0.6)
 plt.savefig(f"{FIGURES_DIR}/steps_taken_vs_episode.png")
 plt.show()
 
-# 2. Path Overlay Plot
 path_map = np.copy(maze).astype(float)
-path_map[path_map == 2] = 0.8 # Mark Goal
-path_map[start] = 0.6 # Mark Start
+path_map[path_map == 2] = 0.8 
+path_map[start] = 0.6 
 if a_star_path:
     for r, c in a_star_path:
         if path_map[r, c] == 0:
             path_map[r, c] = 0.4 
 for r, c in q_path:
-    if path_map[r, c] == 0.4: # Overlap (purple)
+    if path_map[r, c] == 0.4: 
         path_map[r, c] = 0.5
-    elif path_map[r, c] == 0: # Pure Q-path (red)
+    elif path_map[r, c] == 0: 
         path_map[r, c] = 0.2
 
 plt.figure(figsize=(8, 8))
